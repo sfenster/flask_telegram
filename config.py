@@ -1,8 +1,21 @@
-class Config:
-    pass
+class Config(object):
+    TESTING = False
 
-class DevelopmentConfig(Config):
-    DOWNLOADS = '/volumes/G-DRIVE-SSD/Software/telegram'
 
 class ProductionConfig(Config):
-    DOWNLOADS='/media/veracrypt1/telegram'
+    DEVELOPMENT = False
+    DOWNLOADS = '/media/veracrypt1/telegram'
+
+
+class StagingConfig(Config):
+    DEVELOPMENT = True
+
+
+class DevelopmentConfig(Config):
+    FLASK_ENV = development
+    DEVELOPMENT = True
+    DOWNLOADS = '/volumes/G-DRIVE-SSD/Software/telegram'
+
+
+class TestingConfig(Config):
+    TESTING = True
