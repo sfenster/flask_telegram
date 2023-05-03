@@ -12,7 +12,7 @@ class StagingConfig(Config):
 
 
 class DevelopmentConfig(Config):
-    FLASK_ENV = development
+    FLASK_ENV = 'development'
     DEVELOPMENT = True
     DOWNLOADS = '/volumes/G-DRIVE-SSD/Software/telegram'
 

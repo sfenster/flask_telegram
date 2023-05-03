@@ -4,8 +4,13 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
 autopep8 = "*"
+telethon = "*"
+python-dotenv = "*"
+flask = {extras = ["async"], version = "*"}
+quart = "*"
+hypercorn = "*"
+mangum = "*"
 
 [dev-packages]
 autopep8 = "*"
