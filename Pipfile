@@ -11,6 +11,11 @@ flask = {extras = ["async"], version = "*"}
 quart = "*"
 hypercorn = "*"
 mangum = "*"
+"mega.py" = "*"
+bs4 = "*"
+requests = "*"
+youtube-dl = "*"
+yt-dlp = "*"
 
 [dev-packages]
 autopep8 = "*"
