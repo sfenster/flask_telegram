@@ -16,6 +16,7 @@ bs4 = "*"
 requests = "*"
 youtube-dl = "*"
 yt-dlp = "*"
+flask-wtf = "*"
 
 [dev-packages]
 autopep8 = "*"

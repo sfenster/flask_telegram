@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Video Download Form</title>
+</head>
+
+<body>
+    <h1>Video Download Form</h1>
+    <form method="POST">
+        {{ form.csrf_token }}
+        {{ form.url.label }}: {{ form.url() }}<br><br>
+        {{ form.upload_to_telegram.label }}: {{ form.upload_to_telegram() }}<br><br>
+        {{ form.retain_file.label }}: {{ form.retain_file() }}<br><br>
+        {{ form.console_output.label }}:<br>
+        {{ form.console_output(rows=10, cols=80) }}<br><br>
+        <input type="submit" value="Submit">
+    </form>
+</body>
+
+</html>

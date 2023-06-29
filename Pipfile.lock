@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "37bc6366508f9e988f0a737c7cf12414e1ba0e1a57b642b28d2ead62fcd1098a"
+            "sha256": "6278472d6b56ea3a11ea5fe0da1c41f53abbe796b51030f6bd65e84bebd8ab4d"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -257,6 +257,14 @@
             ],
             "index": "pypi",
             "version": "==2.3.2"
+        },
+        "flask-wtf": {
+            "hashes": [
+                "sha256:41c4244e9ae626d63bed42ae4785b90667b885b1535d5a4095e1f63060d12aa9",
+                "sha256:7887d6f1ebb3e17bf648647422f0944c9a469d0fcf63e3b66fb9a83037e38b2c"
+            ],
+            "index": "pypi",
+            "version": "==1.1.1"
         },
         "h11": {
             "hashes": [
@@ -701,6 +709,14 @@
             ],
             "markers": "python_full_version >= '3.7.0'",
             "version": "==1.2.0"
+        },
+        "wtforms": {
+            "hashes": [
+                "sha256:6b351bbb12dd58af57ffef05bc78425d08d1914e0fd68ee14143b7ade023c5bc",
+                "sha256:837f2f0e0ca79481b92884962b914eba4e72b7a2daaf1f939c890ed0124b834b"
+            ],
+            "markers": "python_version >= '3.7'",
+            "version": "==3.0.1"
         },
         "youtube-dl": {
             "hashes": [

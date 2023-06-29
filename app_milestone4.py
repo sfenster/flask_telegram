@@ -1,6 +1,5 @@
 # THIS PROGRAM NEEDS FFMPEG INSTALLED THROUGH APT TO RUN CORRECTLY
-# In order to use flask extensions like Flask-WTF, 'import quart.flask_patch' must be the first import
-import quart.flask_patch
+
 
 import os
 import string
@@ -14,11 +13,9 @@ import yt_dlp
 import logging
 from bs4 import BeautifulSoup
 from mega import Mega
-from quart import Quart, Response, render_template, request, redirect
-from flask_wtf import FlaskForm
-from wtforms import Form, StringField, BooleanField, TextAreaField, validators
+from quart import Quart, Response
 from telethon import TelegramClient, events, errors
-from telethon.tl.types import DocumentAttributeVideo, Channel, ChannelParticipantAdmin, ChannelParticipantCreator
+from telethon.tl.types import DocumentAttributeVideo
 
 dotenv.load_dotenv()
 api_id = os.environ.get('API_ID')
@@ -43,18 +40,12 @@ single_chat_id = -1001529959609
 single_chat_msg_limit = None
 channel_list = []
 
-# Global lists to store the channels and groups
-all_channels_and_groups = []
-owned_channels_and_groups = []
-postable_channels_and_groups = []
-
 app_routes = {
     "/channels": "Lists all channels",
     "/start": "Starts polling for new messages",
     "/stop": "Stops polling for new messages",
     "/add/": "Adds a new channel to polling list",
-    "/delete/": "Deletes an existing channe from polling list",
-    "/scrape": "Downloads all videos embedded in a URL"
+    "/delete/": "Deletes an existing channe from polling list"
 }
 
 # Get the environment object for config.py using the 'APP_SETTINGS' env variable
@@ -62,60 +53,6 @@ envclass_name, envsubclass_name = os.environ.get(
     "APP_SETTINGS", 'config.DevelopmentConfig').split(".")
 envclass = importlib.import_module(envclass_name)
 env = getattr(envclass, envsubclass_name)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-
-# Define the form using WTForms
-
-
-#class VideoDownloadForm(Form):
-#    url = StringField('URL', validators=[validators.DataRequired()])
-#    upload_to_telegram = BooleanField('Upload to Telegram')
-#    retain_file = BooleanField('Retain File')
-#    console_output = TextAreaField(
-#        'Console Output', render_kw={'readonly': True})
-
-
-class MyForm(FlaskForm):
-    name = StringField('name', validators=[validators.DataRequired()])
-
-class VideoDownloadForm(FlaskForm):
-    url = StringField('URL', validators=[validators.DataRequired()])
-    upload_to_telegram = BooleanField('Upload to Telegram')
-    retain_file = BooleanField('Retain File')
-    console_output = TextAreaField(
-        'Console Output', render_kw={'readonly': True})
-
-async def populate_channel_lists():
-    global all_channels_and_groups, owned_channels_and_groups, postable_channels_and_groups
-    
-    # Retrieve all dialogs (channels and chats)
-    dialogs = await client.get_dialogs()
-
-    for dialog in dialogs:
-        if isinstance(dialog.entity, Channel):
-            # Add the channel or group to the all_channels_and_groups list
-            all_channels_and_groups.append(dialog.entity)
-            try:
-                # Check if you are an administrator in the channel or group
-                participants = await client.get_participants(dialog.entity)
-                for participant in participants:
-                    if isinstance(participant, (ChannelParticipantAdmin, ChannelParticipantCreator)) and participant.user_id == client.get_me().id:
-                        # You are an administrator in the channel or group
-                        if participant.creator:
-                            # You own the channel or group
-                            owned_channels_and_groups.append(dialog.entity)
-                        
-                        if participant.admin_rights.post_messages:
-                            # You have posting rights in the channel or group
-                            postable_channels_and_groups.append(dialog.entity)
-            except errors.ChatAdminRequiredError as e:
-                # Handle chat admin required errors, if necessary
-                print(f"Admin required: {e}")
-            except errors.RPCError as e:
-                # Handle other RPC errors, if necessary
-                print(f"RPC error: {e}")
-
-
 
 
 def get_download_dir():
@@ -350,7 +287,6 @@ async def startup():
     print(f'download directory: {downloads}')
     await client.start()
     await import_channels_from_file('./channels.txt')
-    
 
 
 @app.after_serving
@@ -371,19 +307,12 @@ async def index():
 
 
 @app.route("/channels")
-#async def channels():
-#    await get_dialogs()
-#    output_str = ""
-#    for channel in channels_queue:
-#        output_str += f"id: {channel['id']}, title: {channel['title']}\n"
-#    return Response(output_str, mimetype="text/plain")
 async def channels():
-    await populate_channel_lists()
-
-    return await render_template('channels.html',
-                                all_channels=all_channels_and_groups,
-                                owned_channels=owned_channels_and_groups,
-                                postable_channels=postable_channels_and_groups)
+    await get_dialogs()
+    output_str = ""
+    for channel in channels_queue:
+        output_str += f"id: {channel['id']}, title: {channel['title']}\n"
+    return Response(output_str, mimetype="text/plain")
 
 
 @app.route("/start")
@@ -467,100 +396,70 @@ async def recent_vids_from_all_channels():
             await handle_previous_videos(chat, prev_messages_limit)
 
 
-@app.route('/scrape', methods=['GET', 'POST'])
-async def scrape_page():
-    if request.method == 'POST':
-        form = VideoDownloadForm(await request.form, meta={'csrf': False})
-        if form.validate_on_submit():
-            url = form.url.data.strip()
-            upload_to_telegram = form.upload_to_telegram.data
-            retain_file = form.retain_file.data
+@app.route("/scrape/<path>")
+async def scrape_page(path):
+    file_path = f'{downloads}/xhamster/'
+    resp=""
+    web_url = 'https://www.xhamster.com/videos/' + path
+    print(f'Web URL: {web_url}')
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
+    print(f'URL = {web_url}')
+    # Get URL Content
+    r = requests.get(web_url)
 
-            file_path = f'{downloads}/xhamster/'
-            resp=""
-            web_url = url
-            console_output = []
-            
-            print(f'URL = {web_url}')
+    # Parse HTML Code
+    soup = BeautifulSoup(r.content, 'html.parser')
 
-            # Get URL Content
-            r = requests.get(web_url)
+    # List of all video tag
+    video_tags = soup.findAll('video')
+    print("Total ", len(video_tags), "videos found")
 
-            # Parse HTML Code
-            soup = BeautifulSoup(r.content, 'html.parser')
-
-            # List of all video tag
-            video_tags = soup.findAll('video')
-            print("Total ", len(video_tags), "videos found")
-
-            if len(video_tags) != 0:
-                for video_tag in video_tags:
-                    video_url = video_tag['src']
-                    resp = resp + video_url + '\n'
-            else:
-                resp = "no videos found"
-
-            logger = logging.getLogger('youtube-dl')
-            logger.addHandler(logging.StreamHandler())
-            file_type = 'mp4'
-
-            ydl_opts = {
-                'logger': logger,
-                'outtmpl': f'{file_path}%(title)s.%(ext)s',
-                'format': 'bestvideo[ext={0}]+bestaudio[ext={0}]/best'.format(file_type),
-                'merge_output_format': 'mp4',
-                'progress_hooks': [download_progress_hook],
-                'prefer_ffmpeg': True,
-                'restrictfilenames': True,
-                'verbose': True,
-                'recode-video': 'mp4',
-            }
-
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    info_dict = ydl.extract_info(web_url, download=False)
-                    video_title = info_dict.get('title', 'video').replace(" ", "_")
-                    video_title = "".join(
-                        char for char in video_title if char not in string.punctuation or char == "_")
-                    print(f'Attempting to download {web_url} to {file_path}{video_title}.{file_type}')
-                    ydl.download([web_url])
-                    print(f'Successfully downloaded "{video_title}.{file_type}" to {file_path}')
-                    upload_file = file_path + video_title + '.' + file_type     
-
-                    if upload_to_telegram:
-                            try:
-                                console_output.append(
-                                    'Attempting to upload to Telegram.')
-                                await post_video_to_channel(client, upload_file, video_title)
-                                console_output.append('Video uploaded successfully!')
-                            except errors.RPCError as e:
-                                console_output.append(
-                                    f'Failed to upload the video: {str(e)}')
-
-                    if not retain_file:
-                        os.remove(upload_file)
-                        console_output.append('File deleted.')
-
-
-                except Exception as e:
-                    print(f'Failed to download the video: {str(e)}')
-            
-            form.console_output.data = '\n'.join(console_output)
-
+    if len(video_tags) != 0:
+        for video_tag in video_tags:
+            video_url = video_tag['src']
+            resp = resp + video_url + '\n'
     else:
-        form = VideoDownloadForm()
+        resp = "no videos found"
 
-    return await render_template('scrape_form.html', form=form)
+    video_url = "https://www.youtube.com/watch?v=fAixjMvyNX0"
+    logger = logging.getLogger('youtube-dl')
+    logger.addHandler(logging.StreamHandler())
+    file_type = 'mp4'
+
+    ydl_opts = {
+        'logger': logger,
+        'outtmpl': f'{file_path}%(title)s.%(ext)s',
+        'format': 'bestvideo[ext={0}]+bestaudio[ext={0}]/best'.format(file_type),
+        'merge_output_format': 'mp4',
+        'progress_hooks': [download_progress_hook],
+        'prefer_ffmpeg': True,
+        'restrictfilenames': True,
+        'verbose': True,
+        'recode-video': 'mp4',
+    }
 
 
-@app.route('/form', methods=['GET', 'POST'])
-async def submit():
-    form = MyForm(await request.form, meta={'csrf': False})
-    if form.validate_on_submit():
-        return 'Success.'
-    return await render_template('submit.html', form=form)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info_dict = ydl.extract_info(web_url, download=False)
+            video_title = info_dict.get('title', 'video').replace(" ", "_")
+            video_title = "".join(
+                char for char in video_title if char not in string.punctuation or char == "_")
+            print(f'Attempting to download {web_url} to {file_path}{video_title}.{file_type}')
+            ydl.download([web_url])
+            print(f'Successfully downloaded "{video_title}.{file_type}" to {file_path}')
+            upload_file = file_path + video_title + '.' + file_type     
+        except Exception as e:
+            print(f'Failed to download the video: {str(e)}')
+        try:
+            print('Attempting to upload to Telegram.')
+            await post_video_to_channel(client, upload_file, video_title)
+        except Exception as e:
+            print(f'Failed to upload the video: {str(e)}')
+        
 
+    return Response(resp, status=200)
 
 
 # Preserve the ability to run in dev with a simple 'python app.py' command to start dev server

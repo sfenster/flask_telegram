@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Channel Lists</title>
+</head>
+
+<body>
+    <h1>All Channels and Groups:</h1>
+    <ul>
+        {% for channel in all_channels %}
+        <li>{{ channel.title }}</li>
+        {% endfor %}
+    </ul>
+
+    <h1>Owned Channels and Groups:</h1>
+    <ul>
+        {% for channel in owned_channels %}
+        <li>{{ channel.title }}</li>
+        {% endfor %}
+    </ul>
+
+    <h1>Postable Channels and Groups:</h1>
+    <ul>
+        {% for channel in postable_channels %}
+        <li>{{ channel.title }}</li>
+        {% endfor %}
+    </ul>
+</body>
+
+</html>
