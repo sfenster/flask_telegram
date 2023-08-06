@@ -9,21 +9,21 @@
     <h1>All Channels and Groups:</h1>
     <ul>
         {% for channel in all_channels %}
-        <li>{{ channel.title }}</li>
+        <li>{{ channel.title }} - {{ channel.id }}</li>
         {% endfor %}
     </ul>
 
     <h1>Owned Channels and Groups:</h1>
     <ul>
         {% for channel in owned_channels %}
-        <li>{{ channel.title }}</li>
+        <li>{{ channel.title }} - {{ channel.id }}</li>
         {% endfor %}
     </ul>
 
     <h1>Postable Channels and Groups:</h1>
     <ul>
         {% for channel in postable_channels %}
-        <li>{{ channel.title }}</li>
+        <li>{{ channel.title }} - {{ channel.id }}</li>
         {% endfor %}
     </ul>
 </body>

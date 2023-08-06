@@ -7,15 +7,49 @@
 
 <body>
     <h1>Video Download Form</h1>
-    <form method="POST">
+    <form method="POST" id="download_form">
         {{ form.csrf_token }}
         {{ form.url.label }}: {{ form.url() }}<br><br>
         {{ form.upload_to_telegram.label }}: {{ form.upload_to_telegram() }}<br><br>
         {{ form.retain_file.label }}: {{ form.retain_file() }}<br><br>
         {{ form.console_output.label }}:<br>
         {{ form.console_output(rows=10, cols=80) }}<br><br>
-        <input type="submit" value="Submit">
-    </form>
+        <input type="submit" value="Submit" onclick="showStopButton()">
+        <button type="button" name="stop_download_button" id="stop_download_button" value="0" onclick="stopDownloads()"
+            style="display: none;">Stop Downloads</button>
+ </form>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        function showStopButton() {
+            console.log('Submit Button Clicked');
+            document.getElementById("stop_download_button").style.display = "inline-block";
+        }
+    </script>
+    <script>
+        function stopDownloads(event) {
+            event.preventDefault(); // Prevent the default form submission behavior
+
+            // Make an AJAX request to the server
+            console.log('Made it to AJAX request');
+            $.ajax({
+               url: '/scrape',
+                type: 'POST',
+                data: {
+                    stop_download_button: true
+                },
+                success: function (response) {
+                    console.log(response);
+                    // Handle the response from the server
+                },
+                error: function (xhr, status, error) {
+                    console.log(error);
+                    // Handle the error if the request fails
+                }
+            });
+        }
+    </script>
+
 </body>
 
 </html>

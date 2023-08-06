@@ -17,6 +17,7 @@ requests = "*"
 youtube-dl = "*"
 yt-dlp = "*"
 flask-wtf = "*"
+pydantic = "*"
 
 [dev-packages]
 autopep8 = "*"
