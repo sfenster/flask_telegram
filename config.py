@@ -8,6 +8,7 @@ import importlib
 from typing import Dict, List, Optional, Union
 from dotenv import load_dotenv
 from pydantic import BaseModel, validator  # pylint: disable=no-name-in-module
+from utils import import_channels_from_file
 
 load_dotenv()
 CONFIG_FILE_NAME = "tgcf.config.json"
@@ -23,6 +24,11 @@ class MegaConfig(BaseModel):
     MEGA_PASSWORD: str=os.environ.get('MEGA_PASSWORD')
 
 
+class ServiceConfig(BaseModel):
+    polling_channels: List[Union[int, str]
+                           ] = import_channels_from_file('./channels.txt')
+
+
 class Config(object):
     TESTING = False
 
@@ -30,6 +36,7 @@ class Config(object):
 class ProductionConfig(Config):
     DEVELOPMENT = False
     DOWNLOADS = '/media/veracrypt1/telegram'
+
 
 
 class StagingConfig(Config):
@@ -50,6 +57,7 @@ class MasterConfig (BaseModel):
     secret_key: str = os.environ.get('SECRET_KEY')
     login: LoginConfig = LoginConfig()
     mega: MegaConfig = MegaConfig()
+    service: ServiceConfig = ServiceConfig()
 
 
 def write_config_to_file(config: Config):
@@ -74,8 +82,8 @@ def read_config(count=1) -> MasterConfig:
         return read_config(count=count + 1)
 
 
-def get_secret_key() -> str:
-    return os.environ.get('SECRET_KEY')
+#def get_secret_key() -> str:
+#    return os.environ.get('SECRET_KEY')
 
 
 def get_environ_class():

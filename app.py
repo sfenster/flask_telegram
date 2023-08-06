@@ -6,19 +6,17 @@ import os
 import string
 import subprocess
 import asyncio
-import importlib
 import sqlite3
-import requests
 import yt_dlp
-import logging
-from bs4 import BeautifulSoup
 from mega import Mega
 from quart import Quart, Response, render_template, request, jsonify, copy_current_request_context
 from flask_wtf import FlaskForm
-from wtforms import Form, StringField, BooleanField, TextAreaField, SubmitField, HiddenField, validators
+from wtforms import StringField, BooleanField, TextAreaField, SubmitField, HiddenField, validators
 from telethon import TelegramClient, events, errors
-from telethon.tl.types import DocumentAttributeVideo, Channel, ChannelParticipantAdmin, ChannelParticipantCreator
-from config import CONFIG, get_secret_key, get_environ_class
+from telethon.tl.types import DocumentAttributeVideo
+from config import CONFIG, get_environ_class, write_config_to_file
+from utils import get_download_dir, add_channel_id_to_file, remove_channel_id_from_file
+from const import app_routes
 
 mega = Mega()
 mega_login = mega.login(CONFIG.mega.MEGA_EMIAL, CONFIG.mega.MEGA_PASSWORD)
@@ -36,7 +34,6 @@ home = os.path.expanduser('~')
 prev_messages_limit = 5
 single_chat_id = -1001529959609
 single_chat_msg_limit = None
-channel_list = []
 stop_download_flag = False
 stop_event = asyncio.Event()  # Define the module-level event object
 
@@ -44,15 +41,6 @@ stop_event = asyncio.Event()  # Define the module-level event object
 all_channels_and_groups = []
 owned_channels_and_groups = []
 postable_channels_and_groups = []
-
-app_routes = {
-    "/channels": "Lists all channels",
-    "/start": "Starts polling for new messages",
-    "/stop": "Stops polling for new messages",
-    "/add/": "Adds a new channel to polling list",
-    "/delete/": "Deletes an existing channe from polling list",
-    "/scrape": "Downloads all videos embedded in a URL"
-}
 
 env = get_environ_class()
 app.config['SECRET_KEY'] = CONFIG.secret_key
@@ -101,23 +89,6 @@ async def populate_channel_lists():
         except errors.RPCError as e:
             # Handle other RPC errors, if necessary
             print(f"RPC error: {e}")
-
-
-
-
-def get_download_dir():
-    dl = getattr(env, 'DOWNLOADS')
-    dl = dl.replace("~", home)
-    try:
-        if os.access(dl, os.W_OK):
-            return dl  # File was opened successfully
-        # Default to home directory if specified path is not accessible
-        else:
-            dl = f'{home}/incoming'
-            return dl
-    except OSError as e:
-        # File location is not accessible or writable
-        print(f'Error: {str(e)}')
 
 
 def create_downloads_table(conn):
@@ -189,7 +160,6 @@ async def post_video_to_channel(client, video_file, chat_id, caption=''):
         )
 
         # Post the video to the channel
-        # await client.send_file(channel, video, caption=caption)
 
         await client.send_file(
             channel,
@@ -235,7 +205,7 @@ async def download_video(client, message, file_path):
             
             # Upload the video file to Mega.nz
             try:
-                if mega_email and mega_password:
+                if CONFIG.mega.MEGA_EMIAL and CONFIG.mega.MEGA_PASSWORD:
                     mega_folder = mega_login.find('Telegram Videos')
                     if not mega_folder:
                         mega_folder = mega_login.create_folder('Telegram Videos')
@@ -314,21 +284,6 @@ async def handle_previous_videos(chat, prev_messages_limit=None):
             print('Resuming...')
 
 
-async def import_channels_from_file(file_path):
-    global channel_list
-    try:
-        with open(file_path, 'r') as f:
-            channels = f.readlines()
-            print("CHANNELS:")
-            for channel in channels:
-                # Remove any whitespace characters from the start and end of the line
-                channel_id = int(channel.strip())
-                channel_list.append(channel_id)
-                print(f'{channel_id}')
-    except FileNotFoundError:
-        print(f"Error: could not find channel file at {file_path}")
-
-
 def download_progress_hook(d):
     if d['status'] == 'downloading':
         downloaded = d['downloaded_bytes']
@@ -378,10 +333,9 @@ async def scrape_playlist(entries, ydl, file_path, file_type, upload_to_telegram
 @app.before_serving
 async def startup():
     global downloads
-    downloads = get_download_dir()
+    downloads = get_download_dir(env, home)
     print(f'download directory: {downloads}')
     await client.start()
-    await import_channels_from_file('./channels.txt')
     await populate_channel_lists()
 
 
@@ -404,7 +358,6 @@ async def index():
 
 @app.route("/channels")
 async def channels():
-    # await get_dialogs()
     output_str = ""
     megagroup = False
     forum = False
@@ -440,7 +393,7 @@ async def start_polling():
     global task
     if task is None or task.done():
         client.add_event_handler(
-            handle_video, events.NewMessage(chats=channel_list))
+            handle_video, events.NewMessage(chats=CONFIG.service.polling_channels))
         task = asyncio.create_task(client.run_until_disconnected())
         return "Polling started"
     else:
@@ -452,7 +405,7 @@ async def stop_polling():
     global task
     if task is not None and not task.done():
         client.remove_event_handler(
-            handle_video, events.NewMessage(chats=channel_list))
+            handle_video, events.NewMessage(chats=CONFIG.service.polling_channels))
         task.cancel()
         return "Polling stopped"
     else:
@@ -461,17 +414,16 @@ async def stop_polling():
 
 @app.route("/add/<channel_id>", methods=["POST"])
 async def add_channel(channel_id):
-    global channel_list
     try:
         channel_id = int(channel_id)
     except ValueError:
         return Response("Invalid channel ID provided.", status=400)
     try:
         channel = await client.get_entity(channel_id)
-        if channel_id not in channel_list:
-            channel_list.append(channel_id)
-            with open("channels.txt", "a") as file:
-                file.write(f"{channel_id}\n")
+        if channel_id not in CONFIG.service.polling_channels:
+            CONFIG.service.polling_channels.append(channel_id)
+            write_config_to_file()
+            add_channel_id_to_file("channels.txt", channel_id)
             return Response(f"Added channel {channel_id} to list and file.", mimetype="text/plain")
         else:
             return Response(f"Channel {channel_id} already exists in list and file.", mimetype="text/plain")
@@ -481,17 +433,11 @@ async def add_channel(channel_id):
 
 @app.route("/delete/<channel_id>", methods=["POST"])
 async def delete_channel(channel_id):
-    global channel_list
     channel_id = int(channel_id)
-    if channel_id in channel_list:
-        channel_list.remove(channel_id)
-        with open("channels.txt", "r+") as file:
-            lines = file.readlines()
-            file.seek(0)
-            for line in lines:
-                if line.strip() != str(channel_id):
-                    file.write(line)
-            file.truncate()
+    if channel_id in CONFIG.service.polling_channels:
+        CONFIG.service.polling_channels.remove(channel_id)
+        write_config_to_file
+        remove_channel_id_from_file("channels.txt", channel_id)
         return Response(f"Deleted channel {channel_id} from list and file.", mimetype="text/plain")
     else:
         return Response(f"Channel {channel_id} does not exist in list and file.", mimetype="text/plain")
@@ -511,7 +457,7 @@ async def rip_channel(id, limit=single_chat_msg_limit):
 @app.route("/recent")
 async def recent_vids_from_all_channels():
     if prev_messages_limit is not None:
-        for chat_id in channel_list:
+        for chat_id in CONFIG.service.polling_channels:
             chat = await client.get_entity(chat_id)
             await handle_previous_videos(chat, prev_messages_limit)
 
