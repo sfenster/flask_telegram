@@ -27,6 +27,9 @@ class MegaConfig(BaseModel):
 class ServiceConfig(BaseModel):
     polling_channels: List[Union[int, str]
                            ] = import_channels_from_file('./channels.txt')
+    prev_messages_limit: int = 5
+    single_chat_id: int = -1001529959609
+    single_chat_msg_limit: int = None
 
 
 class Config(object):

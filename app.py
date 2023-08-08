@@ -2,6 +2,8 @@
 # In order to use flask extensions like Flask-WTF, 'import quart.flask_patch' must be the first import
 import quart.flask_patch
 
+
+
 import os
 import string
 import subprocess
@@ -17,6 +19,7 @@ from telethon.tl.types import DocumentAttributeVideo
 from config import CONFIG, get_environ_class, write_config_to_file
 from utils import get_download_dir, add_channel_id_to_file, remove_channel_id_from_file
 from const import app_routes
+from async_utils import *
 
 mega = Mega()
 mega_login = mega.login(CONFIG.mega.MEGA_EMIAL, CONFIG.mega.MEGA_PASSWORD)
@@ -30,17 +33,10 @@ task = None
 video_min_duration = 10
 downloads = None
 home = os.path.expanduser('~')
-
-prev_messages_limit = 5
-single_chat_id = -1001529959609
-single_chat_msg_limit = None
 stop_download_flag = False
 stop_event = asyncio.Event()  # Define the module-level event object
 
-# Global lists to store the channels and groups
-all_channels_and_groups = []
-owned_channels_and_groups = []
-postable_channels_and_groups = []
+
 
 env = get_environ_class()
 app.config['SECRET_KEY'] = CONFIG.secret_key
@@ -57,38 +53,6 @@ class VideoDownloadForm(FlaskForm):
         'Console Output', render_kw={'readonly': True})
     stop_download_button = BooleanField('Stop Downloads')
     stop_download_flag = HiddenField()
-
-async def populate_channel_lists():
-    global all_channels_and_groups, owned_channels_and_groups, postable_channels_and_groups
-    
-    # Retrieve all dialogs (channels and chats)
-    async for dialog in client.iter_dialogs():
-        #if isinstance(dialog.entity, Channel):
-        output_str = ""
-        megagroup = False
-        forum = False
-        creator = None
-        try:
-            entity = dialog.entity
-            if dialog.is_channel:
-                # Add the channel or group to the all_channels_and_groups list
-                all_channels_and_groups.append(dialog.entity)
-                megagroup = entity.megagroup
-                forum = entity.forum
-                creator = entity.creator
-            # Check if you are an administrator in the channel or group
-            if creator == True:
-                # You own the channel or group
-                owned_channels_and_groups.append(dialog.entity)
-            if dialog.is_group:
-                # You have posting rights in the channel or group
-                postable_channels_and_groups.append(dialog.entity)
-        except errors.ChatAdminRequiredError as e:
-            # Handle chat admin required errors, if necessary
-            print(f"Admin required: {e}")
-        except errors.RPCError as e:
-            # Handle other RPC errors, if necessary
-            print(f"RPC error: {e}")
 
 
 def create_downloads_table(conn):
@@ -263,7 +227,7 @@ async def handle_video(event):
             await download_video(client, message, file_path)
 
 
-async def handle_previous_videos(chat, prev_messages_limit=None):
+async def handle_previous_videos(chat, prev_messages_limit=CONFIG.service.prev_messages_limit):
     chat_title = chat.title.replace(' ', '_')
     async for message in client.iter_messages(chat, limit=prev_messages_limit):
         try:
@@ -336,7 +300,7 @@ async def startup():
     downloads = get_download_dir(env, home)
     print(f'download directory: {downloads}')
     await client.start()
-    await populate_channel_lists()
+    await populate_channel_lists(client)
 
 
 @app.after_serving
@@ -358,34 +322,12 @@ async def index():
 
 @app.route("/channels")
 async def channels():
-    output_str = ""
-    megagroup = False
-    forum = False
-    creator=None
-    async for dialog in client.iter_dialogs():
-        try:
-            entity = dialog.entity
-            if dialog.is_channel:
-                megagroup=entity.megagroup
-                forum=entity.forum
-                creator=entity.creator
-            output_str += f"{dialog.title} - id: {dialog.id} \n\
-    creator: {creator}\n\
-    is_group: {dialog.is_group}, is_channel: {dialog.is_channel} \n\
-    megagroup: {megagroup}, forum: {forum}\n"
-        except errors.RPCError as e:
-            print(f"RPC error: {e}")
-        
-    #for channel in channels_queue:
-    #    output_str += f"id: {channel['id']}, title: {channel['title']}\n"
-    return Response(output_str, mimetype="text/plain")
-
-    
-
-    #return await render_template('channels.html',
-    #                            all_channels=all_channels_and_groups,
-    #                            owned_channels=owned_channels_and_groups,
-    #                            postable_channels=postable_channels_and_groups)
+    await populate_channel_lists(client)
+    #return await return_channels_as_string(client)
+    return await render_template('channels.html',
+                                all_channels=all_channels_and_groups,
+                                owned_channels=owned_channels_and_groups,
+                                postable_channels=postable_channels_and_groups)
 
 
 @app.route("/start")
@@ -444,7 +386,7 @@ async def delete_channel(channel_id):
 
 
 @app.route("/rip/<id>/<limit>")
-async def rip_channel(id, limit=single_chat_msg_limit):
+async def rip_channel(id, limit=CONFIG.service.single_chat_msg_limit):
         # Call the handle_previous_videos() function for a single chat
     try:
         if id is not None:
@@ -456,10 +398,10 @@ async def rip_channel(id, limit=single_chat_msg_limit):
 
 @app.route("/recent")
 async def recent_vids_from_all_channels():
-    if prev_messages_limit is not None:
+    if CONFIG.service.prev_messages_limit is not None:
         for chat_id in CONFIG.service.polling_channels:
             chat = await client.get_entity(chat_id)
-            await handle_previous_videos(chat, prev_messages_limit)
+            await handle_previous_videos(chat, CONFIG.service.prev_messages_limit)
 
 @app.route('/scrape', methods=['GET', 'POST'])
 async def scrape_page():

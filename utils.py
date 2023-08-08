@@ -1,3 +1,5 @@
+#Synchronous functions to support the application
+
 import os
 
 def get_download_dir(env, home):
