@@ -41,7 +41,7 @@ async def populate_channel_lists(client):
             print(f"RPC error: {e}")
 
 
-async def return_channels_as_string(client) -> str:
+async def return_channels_as_string(client):
     output_str = ""
     megagroup = False
     forum = False
